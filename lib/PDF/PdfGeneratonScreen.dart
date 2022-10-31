@@ -1,15 +1,16 @@
-import 'dart:math';
 import 'dart:io';
-import 'package:mathamatics/PDF/PdfViewer.dart';
+import 'dart:math';
 import 'package:mathamatics/customWidget/MainScreenCard.dart';
 import 'package:mathamatics/customWidget/customWidgetMethods.dart';
 import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/material.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:modal_progress_hud/modal_progress_hud.dart';
+
 class PdfGenerationScreen extends StatefulWidget {
   final IconData icon;
   final operator;
@@ -19,14 +20,12 @@ class PdfGenerationScreen extends StatefulWidget {
   @override
   _PdfGenerationScreenState createState() => _PdfGenerationScreenState();
 }
-var bytes;
+
 class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _ques = TextEditingController();
   final TextEditingController _range1 = TextEditingController();
   final TextEditingController _range2 = TextEditingController();
-  var bytes;
-
   bool isLoading = false;
   List<dynamic> totalQueseion = [];
   List<List<dynamic>> answerBank = [];
@@ -38,17 +37,8 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60.0),
-        child: Container(
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: customAppBar(),
-        ),
-      ),
+      backgroundColor: Colors.pinkAccent,
+      appBar: customAppBar(context),
       body: ModalProgressHUD(
         inAsyncCall: isLoading,
         child: Center(
@@ -61,7 +51,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   SizedBox(height: 40),
-                  Hero(tag: widget.icon, child: Icon(widget.icon, size: 70, color:Color(0XFF1ea366))),
+                  Hero(tag: widget.icon, child: Icon(widget.icon, size: 70, color: Colors.yellow)),
                   SizedBox(height: 30),
                   Form(
                     key: _formKey,
@@ -82,12 +72,13 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                           isLoading = !isLoading;
                         });
                         bool addMeInArray = false;
-                       questionBank.add(["Questions", "Questions", "Questions"]);
+                        questionBank.add(["Questons", "Questons", "Questons"]);
                         answerBank.add(["Answer", "Answer", "Answer"]);
-                        for (var i = 1; i < int.parse(_ques.text  ) + 1; i++) {
+                        for (var i = 1; i < int.parse(_ques.text) + 1; i++) {
                           addMeInArray = false;
                           var val1 = Random().nextInt(int.parse(_range1.text)) + 1;
                           var val2 = Random().nextInt(int.parse(_range2.text)) + 1;
+
                           if (widget.operator == "sum") {
                             totalQueseion.add("$i]  $val1  +  $val2 =  ______ ");
                             totalQueseionAnswer.add("$i]  $val1  +  $val2 =  ${val1 + val2} ");
@@ -121,9 +112,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                         pdf.addPage(
                           pw.MultiPage(
                             crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            build: (pw.Context context) => <pw.Widget>[
-                              pw.Header(level: 0, text: 'Questions'),
-                              pw.Table.fromTextArray(context: context, data: questionBank), pw.Padding(padding: pw.EdgeInsets.all(10))],
+                            build: (pw.Context context) => <pw.Widget>[pw.Table.fromTextArray(context: context, data: questionBank), pw.Padding(padding: pw.EdgeInsets.all(10))],
                           ),
                         );
                         pdf.addPage(
@@ -139,12 +128,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                         questionBank = [];
                         answerBank = [];
                         if (kIsWeb) {
-                          pdf.save().then((value){
-                          setState(() {
-                            bytes=value;
-                          });
-                          });
-                          await Future.delayed(Duration(seconds:1));
+                          final bytes = pdf.save();
                           final blob = html.Blob([bytes], 'application${Random().nextInt(1000)}/pdf');
                           final url = html.Url.createObjectUrlFromBlob(blob);
                           final anchor = html.document.createElement('a') as html.AnchorElement
@@ -152,49 +136,36 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                             ..style.display = 'none'
                             ..download = 'NoMcq${Random().nextInt(1000)}.pdf';
                           html.document.body.children.add(anchor);
-                        /* anchor.click();*/
-                         /* html.document.body.children.remove(anchor);
-                          html.Url.revokeObjectUrl(url);*/
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                PdfViewer(pdfName:'NoMcq${Random().nextInt(1000)}.pdf',pdfSave:bytes,anchor: anchor,)
-                              )
-                          );
-                        }
-                        else {
+                          anchor.click();
+                          html.document.body.children.remove(anchor);
+                          html.Url.revokeObjectUrl(url);
+                        } else {
                           String dir = (await getApplicationDocumentsDirectory()).path;
+
                           String fileName = "NoMcq${Random().nextInt(1000)}.pdf";
                           String path = '$dir/$fileName';
                           final File file = File(path);
-                          pdf.save().then((value){
-                            setState(() {
-                              file.writeAsBytesSync(value);
-                            });
+                          file.writeAsBytesSync(pdf.save());
 
-                           });
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        PdfViewer(pdfName:fileName.toString(),path:path,pdfSave:pdf)
-                                )
-                            );
+                          try {
+                            await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+                          } catch (e) {
+                            print('Error $e');
+                          }
                           totalQueseion = [];
                           answerBank = [];
                           questionBank = [];
                           totalQueseionAnswer = [];
                         }
+
                         setState(() {
                           isLoading = !isLoading;
                         });
                       }
                     },
-                    elevation: 30,
-                    color: Color(0XFF1ea366),
-
-                    child: Padding(padding: EdgeInsets.all(8.0), child: Text("QUESTIONS (No-MCQ)", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600))),
+                    elevation: 10,
+                    color: Colors.yellow,
+                    child: Padding(padding: EdgeInsets.all(8.0), child: Text("QUESTIONS", style: TextStyle(color: Colors.pink, fontSize: 30, fontWeight: FontWeight.bold))),
                   ),
                   SizedBox(height: 30),
                   MaterialButton(
@@ -239,7 +210,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                                     : index == 2
                                         ? 'C'
                                         : 'D';
-                            totalQueseionMCQ.add("A) ${ans[0]}\nB) ${ans[1]}\nC) ${ans[2]}\nD) ${ans[3]}\n");
+                            totalQueseionMCQ.add("A) ${ans[0]}   O    B) ${ans[1]}   O    C) ${ans[2]}   O    D) ${ans[3]}   O   ");
                             totalQueseionAnswer.add("$i] $char");
                             ans = [];
                           } else if (widget.operator == "minus") {
@@ -264,7 +235,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                                     : index == 2
                                         ? 'C'
                                         : 'D';
-                            totalQueseionMCQ.add("A) ${ans[0]}\nB) ${ans[1]}\nC) ${ans[2]}\nD) ${ans[3]}\n");
+                            totalQueseionMCQ.add("A) ${ans[0]}   O    B) ${ans[1]}   O    C) ${ans[2]}   O    D) ${ans[3]}   O   ");
                             totalQueseionAnswer.add("$i] $char");
                             ans = [];
                           } else if (widget.operator == "multification") {
@@ -289,7 +260,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                                     : index == 2
                                         ? 'C'
                                         : 'D';
-                            totalQueseionMCQ.add("A) ${ans[0]}\nB) ${ans[1]}\nC) ${ans[2]}\nD) ${ans[3]}\n");
+                            totalQueseionMCQ.add("A) ${ans[0]}   O    B) ${ans[1]}   O    C) ${ans[2]}   O    D) ${ans[3]}   O   ");
                             totalQueseionAnswer.add("$i] $char");
                             ans = [];
                           } else {
@@ -314,7 +285,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                                     : index == 2
                                         ? 'C'
                                         : 'D';
-                            totalQueseionMCQ.add("A) ${ans[0]}\nB) ${ans[1]}\nC) ${ans[2]}\nD) ${ans[3]}\n");
+                            totalQueseionMCQ.add("A) ${ans[0]}   O    B) ${ans[1]}   O    C) ${ans[2]}   O    D) ${ans[3]}   O   ");
                             totalQueseionAnswer.add("$i] $char");
                             ans = [];
                           }
@@ -329,6 +300,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                           finalMcqPrint.add([totalQueseion[i]]);
                           finalMcqPrint.add([totalQueseionMCQ[i]]);
                         }
+
                         if (!addMeInArray) {
                           addMeInArray = true;
                           finalMcqAnswerPrint.add(totalQueseionAnswer);
@@ -356,6 +328,7 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                           );
                         } catch (e) {
                           print("error $e");
+
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text('Button moved to separate widget'),
                             duration: Duration(seconds: 3),
@@ -363,13 +336,9 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                         }
                         finalMcqAnswerPrint = [];
                         finalMcqPrint = [];
+
                         if (kIsWeb) {
-                         pdf.save().then((value) {
-                           setState(() {
-                             bytes=value;
-                           });
-                         });
-                         await Future.delayed(Duration(seconds:1));
+                          final bytes = pdf.save();
                           final blob = html.Blob([bytes], 'application${Random().nextInt(1000)}/pdf');
                           final url = html.Url.createObjectUrlFromBlob(blob);
                           final anchor = html.document.createElement('a') as html.AnchorElement
@@ -377,35 +346,22 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                             ..style.display = 'none'
                             ..download = 'WithMcq${Random().nextInt(1000)}.pdf';
                           html.document.body.children.add(anchor);
-                        /*  anchor.click();
+                          anchor.click();
                           html.document.body.children.remove(anchor);
-                          html.Url.revokeObjectUrl(url);*/
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) =>
-                                      PdfViewer(pdfName:'NoMcq${Random().nextInt(1000)}.pdf',pdfSave:bytes,anchor: anchor,)
-                              )
-                          );
+                          html.Url.revokeObjectUrl(url);
                         } else {
                           String dir = (await getApplicationDocumentsDirectory()).path;
 
                           String fileName = "WithMcq${Random().nextInt(1000)}.pdf";
                           String path = '$dir/$fileName';
-                          final  file = File(path);
+                          final File file = File(path);
+                          await file.writeAsBytesSync(pdf.save());
 
-                          pdf.save().then((value){
-                               setState(() {
-                              file.writeAsBytesSync(value);
-                            });
-                          });
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) =>
-                                      PdfViewer(pdfName:fileName.toString(),path:path,pdfSave:pdf)
-                              )
-                          );
+                          try {
+                            await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+                          } catch (e) {
+                            print('Error $e');
+                          }
                         }
                         totalQueseion = [];
                         answerBank = [];
@@ -416,9 +372,9 @@ class _PdfGenerationScreenState extends State<PdfGenerationScreen> {
                         isLoading = !isLoading;
                       });
                     },
-                    elevation: 30,
-                    color: Color(0XFF1ea366),
-                    child: Padding(padding: EdgeInsets.all(8.0), child: Text("MCQ", style: TextStyle(color: Colors.white, fontSize:20, fontWeight: FontWeight.w600))),
+                    elevation: 10,
+                    color: Colors.yellow,
+                    child: Padding(padding: EdgeInsets.all(8.0), child: Text("MCQ", style: TextStyle(color: Colors.pink, fontSize: 30, fontWeight: FontWeight.bold))),
                   ),
                   SizedBox(height: 30),
                 ],
