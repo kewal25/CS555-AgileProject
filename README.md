@@ -1,10 +1,10 @@
 # Mathematics flutter
 
 - Addition / Subtraction / Multiplication / Division
-- Generate MCQ PDF / Question PDF : With Answer
+- Generate MCQ PDF / Question PDF :: With Answer
 - Quiz
 - Web Support
-- PWA support for Desktop
+-  PWA support for Desktop
 
 <hr/>
 
